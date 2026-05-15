@@ -364,8 +364,8 @@ export default function PullChain({
     const bodies = bodiesRef.current
     if (bodies.length === 0) return
 
-    const landmarks = results.multiHandLandmarks?.[0]
-    if (!landmarks) {
+    const allHands = results.multiHandLandmarks
+    if (!allHands || allHands.length === 0) {
       handCooldownUntilRef.current = 0
       if (isGrabbingRef.current && !isMouseGrabbingRef.current) {
         releaseAllGrabs()
@@ -373,8 +373,25 @@ export default function PullChain({
       return
     }
 
-    const indexTip = landmarks[INDEX_TIP]
-    const thumbTip = landmarks[THUMB_TIP]
+    const tip = bodies[bodies.length - 1]
+    let bestLandmarks = allHands[0]
+    if (allHands.length > 1) {
+      let bestDist = Infinity
+      for (const hand of allHands) {
+        const it = hand[INDEX_TIP]
+        const tt = hand[THUMB_TIP]
+        const mx = ((1 - it.x) * w + (1 - tt.x) * w) / 2
+        const my = (it.y * h + tt.y * h) / 2
+        const dist = Math.hypot(mx - tip.position.x, my - tip.position.y)
+        if (dist < bestDist) {
+          bestDist = dist
+          bestLandmarks = hand
+        }
+      }
+    }
+
+    const indexTip = bestLandmarks[INDEX_TIP]
+    const thumbTip = bestLandmarks[THUMB_TIP]
 
     const indexTipX = (1 - indexTip.x) * w
     const indexTipY = indexTip.y * h
@@ -400,7 +417,7 @@ export default function PullChain({
       } else {
         const tipsX = (indexTipX + thumbTipX) / 2
         const tipsY = (indexTipY + thumbTipY) / 2
-        Matter.Body.setPosition(bodies[bodies.length - 1], { x: tipsX, y: tipsY })
+        Matter.Body.setPosition(tip, { x: tipsX, y: tipsY })
         checkStretchDuringGrab(true)
       }
     }
