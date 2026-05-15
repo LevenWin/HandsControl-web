@@ -13,7 +13,7 @@
 </div>
 
 <div align="center">
-  <video src="https://xuzqbpkrtimsigzwbavo.supabase.co/storage/v1/object/public/video/Jietu20260515-180449-HD.mp4" width="720" controls muted autoplay loop></video>
+  <video src="public/video.mp4" width="720" controls muted autoplay loop></video>
 </div>
 
 ---
