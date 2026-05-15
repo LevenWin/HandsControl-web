@@ -1,7 +1,5 @@
 <div align="center">
 
-<img src="public/light_on.png" alt="Incandescent Vision Lab" width="120"  height="120" mode="aspectFit" />
-
 # Incandescent Vision Lab
 
 **A seamless blend of vintage interaction and modern technology. This project uses webcam-based hand tracking to let users virtually grab and pull a light chain, toggling the web page's light with fluid, responsive motion effects.**
@@ -12,6 +10,10 @@
 [![TailwindCSS](https://img.shields.io/badge/Tailwind-4-38bdf8)](https://tailwindcss.com/)
 [![Matter.js](https://img.shields.io/badge/Matter.js-0.20-4b5563)](https://brm.io/matter-js/)
 
+</div>
+
+<div align="center">
+  <video src="https://xuzqbpkrtimsigzwbavo.supabase.co/storage/v1/object/public/video/Jietu20260515-180449-HD.mp4" width="720" controls muted autoplay loop></video>
 </div>
 
 ---
