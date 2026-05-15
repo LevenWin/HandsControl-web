@@ -13,7 +13,7 @@
 </div>
 
 <div align="center">
-  <video src="https://github.com/LevenWin/HandsControl-web/blob/main/public/video.mp4" width="720" controls muted autoplay loop></video>
+  <video src="https://github.com/user-attachments/assets/bf84bf7d-2ea6-475e-a507-f1cd25843ce2" width="720" controls muted autoplay loop></video>
 </div>
 
 ---
