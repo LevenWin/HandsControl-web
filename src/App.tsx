@@ -171,6 +171,15 @@ export default function App() {
         >
           {showPanel ? <X size={14} /> : <Settings size={14} />}
         </button>
+
+        <video
+          src="/video.mp4"
+          muted
+          loop
+          autoPlay
+          playsInline
+          className="absolute bottom-3 left-3 z-[60] w-40 h-auto rounded-lg shadow-lg border border-white/20 opacity-80 hover:opacity-100 transition-opacity"
+        />
       </div>
 
       {showPanel && (
