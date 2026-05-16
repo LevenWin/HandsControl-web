@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react'
-import { Settings, X } from 'lucide-react'
+import { Settings, X, ArrowLeft, Lightbulb } from 'lucide-react'
 import LightCanvas from './LightCanvas'
 import ControlPanel from './ControlPanel'
+import HomePage from './HomePage'
 import type { LightPreset } from './types'
 import type { ChainConfig } from './PullChain'
 
@@ -51,6 +52,7 @@ export default function App() {
   const [useWebcam, setUseWebcam] = useState(true)
   const [showPanel, setShowPanel] = useState(false)
   const [chainConfig, setChainConfig] = useState<Partial<ChainConfig>>(defaultChainConfig)
+  const [page, setPage] = useState<'home' | 'app'>('home')
 
   const updateChainConfig = useCallback((key: keyof ChainConfig, value: number | boolean | string) => {
     setChainConfig((prev) => ({ ...prev, [key]: value }))
@@ -141,85 +143,108 @@ export default function App() {
   return (
     <div className="flex w-full h-full bg-bg-primary">
       <audio id="sfx-light" src="/light.wav" preload="auto" style={{ display: 'none' }} />
-      <div className="flex-1 relative">
-        <LightCanvas
-          backgroundImage={backgroundImage}
-          useWebcam={useWebcam}
-          isLightOn={isLightOn}
-          nightMode={nightMode}
-          intensity={intensity}
-          reach={reach}
-          colorTemp={colorTemp}
-          ambientLight={ambientLight}
-          shadowDeepness={shadowDeepness}
-          isoNoise={isoNoise}
-          nightExposure={nightExposure}
-          nightBlueShift={nightBlueShift}
-          bulbX={bulbX}
-          bulbY={bulbY}
-          bulbSize={bulbSize}
-          lightSourceX={lightSourceX}
-          lightSourceY={lightSourceY}
-          onPullRelease={handleToggleLight}
-          chainConfig={chainConfig}
-        />
 
-        <button
-          onClick={() => setShowPanel((p) => !p)}
-          className="absolute top-3 right-3 z-[60] w-8 h-8 flex items-center justify-center rounded-lg bg-black/60 text-text-secondary hover:text-text-primary border border-border/30 transition-colors"
-          title={showPanel ? 'Hide settings' : 'Show settings'}
-        >
-          {showPanel ? <X size={14} /> : <Settings size={14} />}
-        </button>
+      {page === 'home' && (
+        <HomePage onEnter={() => setPage('app')} />
+      )}
 
-        <img
-          src="/example.gif"
-          alt="Demo"
-          className="absolute bottom-3 left-3 z-[60] w-36 h-auto rounded-lg shadow-lg border border-white/20 opacity-80 hover:opacity-100 transition-opacity"
-        />
-      </div>
+      {page === 'app' && (
+        <>
+          <div className="flex-1 relative">
+            <div className="absolute top-3 left-3 z-[60] flex items-center gap-2">
+              <button
+                onClick={() => setPage('home')}
+                className="w-8 h-8 flex items-center justify-center rounded-lg bg-black/60 text-text-secondary hover:text-text-primary border border-border/30 transition-colors"
+                title="Back to home"
+              >
+                <ArrowLeft size={14} />
+              </button>
+              <span className="text-[11px] font-medium text-text-secondary bg-black/60 px-2.5 py-1.5 rounded-lg border border-border/30 flex items-center gap-1.5">
+                <Lightbulb size={12} className="text-accent" />
+                Pull Chain Light
+              </span>
+            </div>
 
-      {showPanel && (
-        <ControlPanel
-        isLightOn={isLightOn}
-        nightMode={nightMode}
-        intensity={intensity}
-        reach={reach}
-        colorTemp={colorTemp}
-        ambientLight={ambientLight}
-        shadowDeepness={shadowDeepness}
-        isoNoise={isoNoise}
-        nightExposure={nightExposure}
-        nightBlueShift={nightBlueShift}
-        bulbX={bulbX}
-        bulbY={bulbY}
-        bulbSize={bulbSize}
-        lightSourceX={lightSourceX}
-        lightSourceY={lightSourceY}
-        backgroundImage={backgroundImage}
-        useWebcam={useWebcam}
-        onToggleLight={handleToggleLight}
-        onIntensityChange={setIntensity}
-        onReachChange={setReach}
-        onColorTempChange={setColorTemp}
-        onAmbientLightChange={setAmbientLight}
-        onShadowDeepnessChange={setShadowDeepness}
-        onIsoNoiseChange={setIsoNoise}
-        onNightExposureChange={setNightExposure}
-        onNightBlueShiftChange={setNightBlueShift}
-        onNightModeToggle={() => setNightMode((p) => !p)}
-        onBulbXChange={setBulbX}
-        onBulbYChange={setBulbY}
-        onBulbSizeChange={setBulbSize}
-        onLightSourceXChange={setLightSourceX}
-        onLightSourceYChange={setLightSourceY}
-        onUploadBackground={handleUploadBackground}
-        onToggleWebcam={handleToggleWebcam}
-        onExportPreset={handleExportPreset}
-        onImportPreset={handleImportPreset}
-        chainConfig={chainConfig}
-        onChainConfigChange={updateChainConfig}
-      />
+            <LightCanvas
+              backgroundImage={backgroundImage}
+              useWebcam={useWebcam}
+              isLightOn={isLightOn}
+              nightMode={nightMode}
+              intensity={intensity}
+              reach={reach}
+              colorTemp={colorTemp}
+              ambientLight={ambientLight}
+              shadowDeepness={shadowDeepness}
+              isoNoise={isoNoise}
+              nightExposure={nightExposure}
+              nightBlueShift={nightBlueShift}
+              bulbX={bulbX}
+              bulbY={bulbY}
+              bulbSize={bulbSize}
+              lightSourceX={lightSourceX}
+              lightSourceY={lightSourceY}
+              onPullRelease={handleToggleLight}
+              chainConfig={chainConfig}
+            />
+
+            <button
+              onClick={() => setShowPanel((p) => !p)}
+              className="absolute top-3 right-3 z-[60] w-8 h-8 flex items-center justify-center rounded-lg bg-black/60 text-text-secondary hover:text-text-primary border border-border/30 transition-colors"
+              title={showPanel ? 'Hide settings' : 'Show settings'}
+            >
+              {showPanel ? <X size={14} /> : <Settings size={14} />}
+            </button>
+
+            <img
+              src="/example.gif"
+              alt="Demo"
+              className="absolute bottom-3 left-3 z-[60] w-36 h-auto rounded-lg shadow-lg border border-white/20 opacity-80 hover:opacity-100 transition-opacity"
+            />
+          </div>
+
+          {showPanel && (
+            <ControlPanel
+              isLightOn={isLightOn}
+              nightMode={nightMode}
+              intensity={intensity}
+              reach={reach}
+              colorTemp={colorTemp}
+              ambientLight={ambientLight}
+              shadowDeepness={shadowDeepness}
+              isoNoise={isoNoise}
+              nightExposure={nightExposure}
+              nightBlueShift={nightBlueShift}
+              bulbX={bulbX}
+              bulbY={bulbY}
+              bulbSize={bulbSize}
+              lightSourceX={lightSourceX}
+              lightSourceY={lightSourceY}
+              backgroundImage={backgroundImage}
+              useWebcam={useWebcam}
+              onToggleLight={handleToggleLight}
+              onIntensityChange={setIntensity}
+              onReachChange={setReach}
+              onColorTempChange={setColorTemp}
+              onAmbientLightChange={setAmbientLight}
+              onShadowDeepnessChange={setShadowDeepness}
+              onIsoNoiseChange={setIsoNoise}
+              onNightExposureChange={setNightExposure}
+              onNightBlueShiftChange={setNightBlueShift}
+              onNightModeToggle={() => setNightMode((p) => !p)}
+              onBulbXChange={setBulbX}
+              onBulbYChange={setBulbY}
+              onBulbSizeChange={setBulbSize}
+              onLightSourceXChange={setLightSourceX}
+              onLightSourceYChange={setLightSourceY}
+              onUploadBackground={handleUploadBackground}
+              onToggleWebcam={handleToggleWebcam}
+              onExportPreset={handleExportPreset}
+              onImportPreset={handleImportPreset}
+              chainConfig={chainConfig}
+              onChainConfigChange={updateChainConfig}
+            />
+          )}
+        </>
       )}
     </div>
   )
