@@ -407,7 +407,10 @@ export default function PullChain({
     if (isPinching && !isAnyGrabbing()) {
       const tipsX = (indexTipX + thumbTipX) / 2
       const tipsY = (indexTipY + thumbTipY) / 2
-      doHandGrab(tipsX, tipsY)
+      if (doHandGrab(tipsX, tipsY)) {
+        Matter.Body.setPosition(tip, { x: tipsX, y: tipsY })
+        grabStartDistRef.current = getChainDistFromAnchor()
+      }
     }
 
     if (isGrabbingRef.current && !isMouseGrabbingRef.current) {
