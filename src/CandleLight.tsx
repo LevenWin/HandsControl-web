@@ -10,7 +10,6 @@ interface CandleConfig {
   spotlightRadius: number
   flickerAmplitude: number
   flickerSpeed: number
-  darknessAlpha: number
   warmth: number
 }
 
@@ -23,7 +22,6 @@ const defaultConfig: CandleConfig = {
   spotlightRadius: 160,
   flickerAmplitude: 8,
   flickerSpeed: 0.03,
-  darknessAlpha: 0.92,
   warmth: 0.85,
 }
 
@@ -68,7 +66,6 @@ function Slider({ label, value, min, max, step, onChange, unit }: SliderProps) {
   )
 }
 
-const WARM_BACKGROUND = '#0d0500'
 
 export default function CandleLight({ onBack }: { onBack: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -175,22 +172,21 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
         const sh = hasWebcam ? (videoRef.current!.videoHeight || h) : (bgImage!.naturalHeight || h)
         drawCoverBackground(ctx, bgSource, sw, sh, w, h)
       } else {
-        ctx.fillStyle = WARM_BACKGROUND
+        ctx.fillStyle = '#000'
         ctx.fillRect(0, 0, w, h)
       }
 
-      const darkAlpha = c.darknessAlpha
       ctx.save()
-      ctx.fillStyle = `rgba(8,3,0,${darkAlpha})`
+      ctx.fillStyle = 'rgba(0,0,0,1)'
       ctx.fillRect(0, 0, w, h)
 
       ctx.globalCompositeOperation = 'destination-out'
       const revealGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, innerR, flameScreenX, flameScreenY, flickerR)
       revealGrad.addColorStop(0, 'rgba(255,255,255,1)')
-      revealGrad.addColorStop(0.15, 'rgba(255,255,255,0.97)')
-      revealGrad.addColorStop(0.35, 'rgba(255,255,255,0.85)')
-      revealGrad.addColorStop(0.6, 'rgba(255,255,255,0.5)')
-      revealGrad.addColorStop(0.8, 'rgba(255,255,255,0.15)')
+      revealGrad.addColorStop(0.1, 'rgba(255,255,255,1)')
+      revealGrad.addColorStop(0.3, 'rgba(255,255,255,0.88)')
+      revealGrad.addColorStop(0.55, 'rgba(255,255,255,0.45)')
+      revealGrad.addColorStop(0.8, 'rgba(255,255,255,0.08)')
       revealGrad.addColorStop(1, 'rgba(255,255,255,0)')
       ctx.fillStyle = revealGrad
       ctx.beginPath()
@@ -199,11 +195,11 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
       ctx.restore()
 
       ctx.save()
-      const glowR = flickerR * 1.8
-      const glowGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, flickerR * 0.3, flameScreenX, flameScreenY, glowR)
-      glowGrad.addColorStop(0, `rgba(255,180,60,${c.warmth * 0.15})`)
-      glowGrad.addColorStop(0.3, `rgba(255,140,30,${c.warmth * 0.08})`)
-      glowGrad.addColorStop(0.7, 'rgba(200,80,20,0.02)')
+      const glowR = flickerR * 1.6
+      const glowGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, flickerR * 0.25, flameScreenX, flameScreenY, glowR)
+      glowGrad.addColorStop(0, `rgba(255,180,50,${c.warmth * 0.3})`)
+      glowGrad.addColorStop(0.3, `rgba(255,140,20,${c.warmth * 0.12})`)
+      glowGrad.addColorStop(0.7, 'rgba(200,80,10,0.01)')
       glowGrad.addColorStop(1, 'rgba(0,0,0,0)')
       ctx.fillStyle = glowGrad
       ctx.beginPath()
@@ -378,7 +374,6 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
           <Slider label="Flicker Speed" value={cfg.flickerSpeed} min={0.005} max={0.12} step={0.005} onChange={(v) => updateCfg('flickerSpeed', v)} />
 
           <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Lighting</h3>
-          <Slider label="Darkness" value={cfg.darknessAlpha} min={0.6} max={0.99} step={0.01} onChange={(v) => updateCfg('darknessAlpha', v)} />
           <Slider label="Warmth" value={cfg.warmth} min={0} max={1.5} step={0.05} onChange={(v) => updateCfg('warmth', v)} />
 
           <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Candle</h3>
