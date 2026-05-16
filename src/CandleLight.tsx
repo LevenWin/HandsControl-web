@@ -202,7 +202,7 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     const img = new Image()
-    img.src = '/candle_bg.png'
+    img.src = '/candle_bg.jpg'
     img.onload = () => { setBgImage(img) }
   }, [])
 
