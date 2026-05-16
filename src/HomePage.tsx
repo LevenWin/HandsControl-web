@@ -1,6 +1,6 @@
-import { ArrowRight, ExternalLink } from 'lucide-react'
+import { ArrowRight, ExternalLink, Flame } from 'lucide-react'
 
-export default function HomePage({ onEnter }: { onEnter: () => void }) {
+export default function HomePage({ onEnterChain, onEnterCandle }: { onEnterChain: () => void; onEnterCandle: () => void }) {
   return (
     <div className="w-full h-full bg-bg-primary flex items-center justify-center overflow-hidden relative">
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none"
@@ -30,10 +30,19 @@ export default function HomePage({ onEnter }: { onEnter: () => void }) {
 
         <div className="flex flex-col gap-3 w-full max-w-xs">
           <button
-            onClick={onEnter}
+            onClick={onEnterChain}
             className="w-full py-3 rounded-xl bg-accent text-black text-sm font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-amber-400 transition-all shadow-lg shadow-accent/30 active:scale-[0.98]"
           >
-            <span>Launch Lab</span>
+            <span>Pull Chain Light</span>
+            <ArrowRight size={16} />
+          </button>
+
+          <button
+            onClick={onEnterCandle}
+            className="w-full py-3 rounded-xl bg-warm-glow/20 text-warm-glow text-sm font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-warm-glow/30 border border-warm-glow/20 transition-all active:scale-[0.98]"
+          >
+            <Flame size={16} />
+            <span>Candle Light</span>
             <ArrowRight size={16} />
           </button>
 

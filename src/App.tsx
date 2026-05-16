@@ -3,6 +3,7 @@ import { Settings, X, ArrowLeft, Lightbulb } from 'lucide-react'
 import LightCanvas from './LightCanvas'
 import ControlPanel from './ControlPanel'
 import HomePage from './HomePage'
+import CandleLight from './CandleLight'
 import type { LightPreset } from './types'
 import type { ChainConfig } from './PullChain'
 
@@ -52,7 +53,7 @@ export default function App() {
   const [useWebcam, setUseWebcam] = useState(true)
   const [showPanel, setShowPanel] = useState(false)
   const [chainConfig, setChainConfig] = useState<Partial<ChainConfig>>(defaultChainConfig)
-  const [page, setPage] = useState<'home' | 'app'>('home')
+  const [page, setPage] = useState<'home' | 'chain' | 'candle'>('home')
 
   const updateChainConfig = useCallback((key: keyof ChainConfig, value: number | boolean | string) => {
     setChainConfig((prev) => ({ ...prev, [key]: value }))
@@ -145,10 +146,10 @@ export default function App() {
       <audio id="sfx-light" src="/light.wav" preload="auto" style={{ display: 'none' }} />
 
       {page === 'home' && (
-        <HomePage onEnter={() => setPage('app')} />
+        <HomePage onEnterChain={() => setPage('chain')} onEnterCandle={() => setPage('candle')} />
       )}
 
-      {page === 'app' && (
+      {page === 'chain' && (
         <>
           <div className="flex-1 relative">
             <div className="absolute top-3 left-3 z-[60] flex items-center gap-2">
@@ -245,6 +246,10 @@ export default function App() {
             />
           )}
         </>
+      )}
+
+      {page === 'candle' && (
+        <CandleLight onBack={() => setPage('home')} />
       )}
     </div>
   )
