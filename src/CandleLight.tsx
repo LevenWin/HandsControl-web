@@ -1,13 +1,78 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { ArrowLeft, Upload, Camera } from 'lucide-react'
+import { ArrowLeft, Upload, Camera, Settings, X } from 'lucide-react'
 
-const FLAME_OFFSET_X = 0
-const FLAME_OFFSET_Y = -18
-const SPOTLIGHT_RADIUS = 180
-const FLICKER_AMPLITUDE = 14
-const FLICKER_SPEED = 0.02
-const DARKNESS_ALPHA = 0.95
-const VIGNETTE_BLUR = 3
+interface CandleConfig {
+  candleX: number
+  candleY: number
+  flameOffsetX: number
+  flameOffsetY: number
+  candleScale: number
+  spotlightRadius: number
+  flickerAmplitude: number
+  flickerSpeed: number
+  darknessAlpha: number
+  warmth: number
+  bloomStrength: number
+  vignetteSoftness: number
+}
+
+const defaultConfig: CandleConfig = {
+  candleX: 0.5,
+  candleY: 0.35,
+  flameOffsetX: 0,
+  flameOffsetY: -18,
+  candleScale: 1.0,
+  spotlightRadius: 160,
+  flickerAmplitude: 8,
+  flickerSpeed: 0.03,
+  darknessAlpha: 0.92,
+  warmth: 0.85,
+  bloomStrength: 0.5,
+  vignetteSoftness: 1.0,
+}
+
+interface SliderProps {
+  label: string
+  value: number
+  min: number
+  max: number
+  step: number
+  onChange: (v: number) => void
+  unit?: string
+}
+
+function Slider({ label, value, min, max, step, onChange, unit }: SliderProps) {
+  const pct = ((value - min) / (max - min)) * 100
+  return (
+    <div className="mb-2.5">
+      <div className="flex justify-between items-center mb-0.5">
+        <span className="text-[10px] text-text-dim">{label}</span>
+        <span className="text-[10px] text-text-secondary tabular-nums">
+          {value.toFixed(step < 0.01 ? 3 : step < 0.1 ? 2 : 0)}{unit ?? ''}
+        </span>
+      </div>
+      <div className="relative h-1.5 bg-bg-control rounded-full cursor-pointer"
+        onPointerDown={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect()
+          const update = (ev: PointerEvent) => {
+            const p = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width))
+            onChange(Math.round((min + p * (max - min)) / step) * step)
+          }
+          update(e.nativeEvent)
+          const onUp = () => { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp) }
+          const onMove = (ev: PointerEvent) => update(ev)
+          window.addEventListener('pointermove', onMove)
+          window.addEventListener('pointerup', onUp)
+        }}
+      >
+        <div className="absolute top-0 left-0 h-full bg-warm-glow rounded-full transition-all duration-75" style={{ width: `${pct}%` }} />
+        <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full shadow border border-warm-glow/50 transition-all duration-75" style={{ left: `${pct}%`, marginLeft: -6 }} />
+      </div>
+    </div>
+  )
+}
+
+const WARM_BACKGROUND = '#0d0500'
 
 export default function CandleLight({ onBack }: { onBack: () => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -15,13 +80,32 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
   const candleImgRef = useRef<HTMLImageElement | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const mouseRef = useRef({ x: -200, y: -200 })
-  const targetRef = useRef({ x: -200, y: -200 })
   const animRef = useRef(0)
   const sizeRef = useRef({ w: 0, h: 0 })
   const flickerPhaseRef = useRef(0)
   const [useWebcam, setUseWebcam] = useState(false)
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
+  const [showPanel, setShowPanel] = useState(false)
+  const [cfg, setCfg] = useState<CandleConfig>(defaultConfig)
+  const cfgRef = useRef(defaultConfig)
+  cfgRef.current = cfg
+
+  const draggingRef = useRef(false)
+  const dragOffsetRef = useRef({ x: 0, y: 0 })
+  const candleScreenRef = useRef({ x: 0, y: 0, w: 0, h: 0 })
+
+  const updateCandleScreen = (imgW: number, imgH: number, screenW: number, screenH: number) => {
+    const c = cfgRef.current
+    const cw = 64 * c.candleScale
+    const ch = (imgH / imgW) * cw
+    const cx = c.candleX * screenW - cw / 2
+    const cy = c.candleY * screenH - ch / 2
+    candleScreenRef.current = { x: cx, y: cy, w: cw, h: ch }
+  }
+
+  const updateCfg = useCallback((key: keyof CandleConfig, value: number) => {
+    setCfg((prev) => ({ ...prev, [key]: value }))
+  }, [])
 
   const drawCoverBackground = useCallback((ctx: CanvasRenderingContext2D, source: CanvasImageSource, sw: number, sh: number, dw: number, dh: number) => {
     const scale = Math.max(dw / sw, dh / sh)
@@ -37,6 +121,10 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
     img.src = '/candle.png'
     img.onload = () => {
       candleImgRef.current = img
+      const { w, h } = sizeRef.current
+      if (w > 0 && h > 0) {
+        updateCandleScreen(img.naturalWidth, img.naturalHeight, w, h)
+      }
     }
   }, [])
 
@@ -46,6 +134,7 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
     if (!container || !canvas) return
 
     let running = true
+    const ctx = canvas.getContext('2d', { willReadFrequently: false })!
 
     const resize = () => {
       const w = container.clientWidth
@@ -53,13 +142,13 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
       sizeRef.current = { w, h }
       canvas.width = w
       canvas.height = h
+      const img = candleImgRef.current
+      if (img) updateCandleScreen(img.naturalWidth, img.naturalHeight, w, h)
     }
 
     resize()
     const ro = new ResizeObserver(resize)
     ro.observe(container)
-
-    const ease = 0.12
 
     const render = () => {
       if (!running) return
@@ -69,70 +158,93 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
         return
       }
 
-      const ctx2 = canvas.getContext('2d')!
-      ctx2.clearRect(0, 0, w, h)
-
+      const c = cfgRef.current
       const hasWebcam = useWebcam && videoRef.current && videoRef.current.readyState >= 2
       const bgSource = hasWebcam ? videoRef.current : bgImage
+
+      const flameScreenX = c.candleX * w + c.flameOffsetX
+      const flameScreenY = c.candleY * h + c.flameOffsetY
+      const candleImg = candleImgRef.current
+
+      flickerPhaseRef.current += c.flickerSpeed
+      const sinFlicker = Math.sin(flickerPhaseRef.current) * c.flickerAmplitude
+      const noiseFlicker = (Math.random() - 0.5) * c.flickerAmplitude * 0.5
+      const flickerR = c.spotlightRadius + sinFlicker + noiseFlicker
+      const innerR = flickerR * 0.1
+
+      ctx.save()
+      ctx.clearRect(0, 0, w, h)
 
       if (bgSource) {
         const sw = hasWebcam ? (videoRef.current!.videoWidth || w) : (bgImage!.naturalWidth || w)
         const sh = hasWebcam ? (videoRef.current!.videoHeight || h) : (bgImage!.naturalHeight || h)
-        drawCoverBackground(ctx2, bgSource, sw, sh, w, h)
+        drawCoverBackground(ctx, bgSource, sw, sh, w, h)
       } else {
-        ctx2.fillStyle = '#0a0a0a'
-        ctx2.fillRect(0, 0, w, h)
+        ctx.fillStyle = WARM_BACKGROUND
+        ctx.fillRect(0, 0, w, h)
       }
 
-      const mx = targetRef.current.x
-      const my = targetRef.current.y
-      mouseRef.current.x += (mx - mouseRef.current.x) * ease
-      mouseRef.current.y += (my - mouseRef.current.y) * ease
-      const lx = mouseRef.current.x
-      const ly = mouseRef.current.y
+      const darkAlpha = c.darknessAlpha
+      ctx.fillStyle = `rgba(8,3,0,${darkAlpha})`
+      ctx.fillRect(0, 0, w, h)
 
-      flickerPhaseRef.current += FLICKER_SPEED
-      const sinFlicker = Math.sin(flickerPhaseRef.current) * FLICKER_AMPLITUDE
-      const noiseFlicker = (Math.random() - 0.5) * FLICKER_AMPLITUDE * 0.6
-      const flickerR = SPOTLIGHT_RADIUS + sinFlicker + noiseFlicker
-      const innerR = flickerR * 0.15
+      ctx.globalCompositeOperation = 'destination-out'
+      const revealGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, innerR, flameScreenX, flameScreenY, flickerR)
+      revealGrad.addColorStop(0, 'rgba(255,160,40,1)')
+      revealGrad.addColorStop(0.2, 'rgba(255,140,30,0.95)')
+      revealGrad.addColorStop(0.5, 'rgba(255,100,20,0.6)')
+      revealGrad.addColorStop(0.8, 'rgba(200,60,10,0.2)')
+      revealGrad.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = revealGrad
+      ctx.beginPath()
+      ctx.arc(flameScreenX, flameScreenY, flickerR, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
 
-      ctx2.save()
-      ctx2.fillStyle = `rgba(0,0,0,${DARKNESS_ALPHA})`
-      ctx2.fillRect(0, 0, w, h)
-
-      ctx2.globalCompositeOperation = 'destination-out'
-      const gradient = ctx2.createRadialGradient(lx, ly, innerR, lx, ly, flickerR)
-      gradient.addColorStop(0, 'rgba(255,255,255,1)')
-      gradient.addColorStop(0.35, 'rgba(255,255,255,0.85)')
-      gradient.addColorStop(0.65, 'rgba(255,255,255,0.35)')
-      gradient.addColorStop(1, 'rgba(255,255,255,0)')
-      ctx2.fillStyle = gradient
-      ctx2.beginPath()
-      ctx2.arc(lx, ly, flickerR, 0, Math.PI * 2)
-      ctx2.fill()
-      ctx2.restore()
-
-      if (VIGNETTE_BLUR > 0 && bgSource) {
-        ctx2.save()
-        ctx2.globalCompositeOperation = 'source-over'
-        const vignetteGrad = ctx2.createRadialGradient(lx, ly, flickerR * 0.6, lx, ly, flickerR * 1.8)
-        vignetteGrad.addColorStop(0, 'rgba(0,0,0,0)')
-        vignetteGrad.addColorStop(1, `rgba(0,0,0,${DARKNESS_ALPHA})`)
-        ctx2.fillStyle = vignetteGrad
-        ctx2.beginPath()
-        ctx2.arc(lx, ly, flickerR * 1.8, 0, Math.PI * 2)
-        ctx2.fill()
-        ctx2.restore()
+      if (bgSource) {
+        ctx.save()
+        const vignetteR = flickerR * 2.2 * c.vignetteSoftness
+        const vignetteGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, flickerR * 0.5, flameScreenX, flameScreenY, vignetteR)
+        vignetteGrad.addColorStop(0, 'rgba(8,3,0,0)')
+        vignetteGrad.addColorStop(0.7, 'rgba(8,3,0,0)')
+        vignetteGrad.addColorStop(1, `rgba(8,3,0,${darkAlpha * 0.7})`)
+        ctx.fillStyle = vignetteGrad
+        ctx.beginPath()
+        ctx.arc(flameScreenX, flameScreenY, vignetteR, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
       }
 
-      const candle = candleImgRef.current
-      if (candle) {
-        const cw = 64
-        const ch = (candle.naturalHeight / candle.naturalWidth) * cw
-        const cx = lx - cw / 2 + FLAME_OFFSET_X
-        const cy = ly - ch / 2 + FLAME_OFFSET_Y
-        ctx2.drawImage(candle, cx, cy, cw, ch)
+      ctx.save()
+      ctx.globalCompositeOperation = 'overlay'
+      const warmthGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, innerR * 0.5, flameScreenX, flameScreenY, flickerR * 1.3)
+      warmthGrad.addColorStop(0, `rgba(255,180,60,${c.warmth * 0.6})`)
+      warmthGrad.addColorStop(0.4, `rgba(255,140,30,${c.warmth * 0.35})`)
+      warmthGrad.addColorStop(0.8, `rgba(200,80,20,${c.warmth * 0.1})`)
+      warmthGrad.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = warmthGrad
+      ctx.beginPath()
+      ctx.arc(flameScreenX, flameScreenY, flickerR * 1.3, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.restore()
+
+      if (c.bloomStrength > 0) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'lighter'
+        const bloomGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, innerR * 0.3, flameScreenX, flameScreenY, flickerR * 0.6)
+        bloomGrad.addColorStop(0, `rgba(255,220,140,${c.bloomStrength * 0.7})`)
+        bloomGrad.addColorStop(0.4, `rgba(255,180,80,${c.bloomStrength * 0.3})`)
+        bloomGrad.addColorStop(1, 'rgba(255,100,30,0)')
+        ctx.fillStyle = bloomGrad
+        ctx.beginPath()
+        ctx.arc(flameScreenX, flameScreenY, flickerR * 0.6, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.restore()
+      }
+
+      if (candleImg) {
+        const cs = candleScreenRef.current
+        ctx.drawImage(candleImg, cs.x, cs.y, cs.w, cs.h)
       }
 
       animRef.current = requestAnimationFrame(render)
@@ -140,10 +252,52 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
 
     animRef.current = requestAnimationFrame(render)
 
+    const onPointerDown = (e: PointerEvent) => {
+      const cs = candleScreenRef.current
+      if (e.clientX >= cs.x && e.clientX <= cs.x + cs.w && e.clientY >= cs.y && e.clientY <= cs.y + cs.h) {
+        draggingRef.current = true
+        dragOffsetRef.current = { x: e.clientX - cs.x, y: e.clientY - cs.y }
+        if (canvasRef.current) canvasRef.current.style.cursor = 'grabbing'
+        e.preventDefault()
+      }
+    }
+    const onPointerMove = (e: PointerEvent) => {
+      if (draggingRef.current) {
+        const { w, h } = sizeRef.current
+        const nx = (e.clientX - dragOffsetRef.current.x + candleScreenRef.current.w / 2) / w
+        const ny = (e.clientY - dragOffsetRef.current.y + candleScreenRef.current.h / 2) / h
+        const cx = Math.max(0.02, Math.min(0.98, nx))
+        const cy = Math.max(0.02, Math.min(0.98, ny))
+        setCfg((prev) => ({ ...prev, candleX: cx, candleY: cy }))
+        const img = candleImgRef.current
+        if (img) updateCandleScreen(img.naturalWidth, img.naturalHeight, w, h)
+      } else {
+        const cs = candleScreenRef.current
+        if (e.clientX >= cs.x && e.clientX <= cs.x + cs.w && e.clientY >= cs.y && e.clientY <= cs.y + cs.h) {
+          if (canvasRef.current) canvasRef.current.style.cursor = 'grab'
+        } else {
+          if (canvasRef.current) canvasRef.current.style.cursor = 'default'
+        }
+      }
+    }
+    const onPointerUp = () => {
+      draggingRef.current = false
+      if (canvasRef.current) canvasRef.current.style.cursor = 'default'
+    }
+
+    canvas.addEventListener('pointerdown', onPointerDown)
+    canvas.addEventListener('pointermove', onPointerMove)
+    canvas.addEventListener('pointerup', onPointerUp)
+    canvas.addEventListener('pointerleave', onPointerUp)
+
     return () => {
       running = false
       cancelAnimationFrame(animRef.current)
       ro.disconnect()
+      canvas.removeEventListener('pointerdown', onPointerDown)
+      canvas.removeEventListener('pointermove', onPointerMove)
+      canvas.removeEventListener('pointerup', onPointerUp)
+      canvas.removeEventListener('pointerleave', onPointerUp)
     }
   }, [useWebcam, bgImage, drawCoverBackground])
 
@@ -183,15 +337,6 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
     }
   }, [useWebcam])
 
-  useEffect(() => {
-    const onMove = (e: PointerEvent) => {
-      targetRef.current.x = e.clientX
-      targetRef.current.y = e.clientY
-    }
-    window.addEventListener('pointermove', onMove)
-    return () => window.removeEventListener('pointermove', onMove)
-  }, [])
-
   const handleFileUpload = useCallback((file: File) => {
     const url = URL.createObjectURL(file)
     const img = new Image()
@@ -203,8 +348,8 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
   }, [])
 
   return (
-    <div ref={containerRef} className="w-full h-full bg-black overflow-hidden relative cursor-none">
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+    <div ref={containerRef} className="w-full h-full bg-black overflow-hidden relative">
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ cursor: 'default' }} />
 
       <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
         <button
@@ -243,7 +388,45 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
         >
           <Camera size={14} />
         </button>
+        <button
+          onClick={() => setShowPanel((p) => !p)}
+          className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${
+            showPanel
+              ? 'bg-accent/20 text-accent border-accent/30'
+              : 'bg-black/40 text-text-secondary hover:text-text-primary border-white/10'
+          }`}
+          title="Settings"
+        >
+          {showPanel ? <X size={14} /> : <Settings size={14} />}
+        </button>
       </div>
+
+      {showPanel && (
+        <div className="absolute top-14 right-3 z-20 w-52 bg-black/80 border border-white/10 rounded-xl p-3 backdrop-blur-xl max-h-[80vh] overflow-y-auto">
+          <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mb-2">Flame</h3>
+          <Slider label="Spotlight Radius" value={cfg.spotlightRadius} min={60} max={350} step={1} onChange={(v) => updateCfg('spotlightRadius', v)} unit="px" />
+          <Slider label="Flicker Amount" value={cfg.flickerAmplitude} min={0} max={30} step={0.5} onChange={(v) => updateCfg('flickerAmplitude', v)} unit="px" />
+          <Slider label="Flicker Speed" value={cfg.flickerSpeed} min={0.005} max={0.12} step={0.005} onChange={(v) => updateCfg('flickerSpeed', v)} />
+
+          <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Lighting</h3>
+          <Slider label="Darkness" value={cfg.darknessAlpha} min={0.6} max={0.99} step={0.01} onChange={(v) => updateCfg('darknessAlpha', v)} />
+          <Slider label="Warmth" value={cfg.warmth} min={0} max={1.5} step={0.05} onChange={(v) => updateCfg('warmth', v)} />
+          <Slider label="Bloom" value={cfg.bloomStrength} min={0} max={1} step={0.05} onChange={(v) => updateCfg('bloomStrength', v)} />
+          <Slider label="Vignette" value={cfg.vignetteSoftness} min={0.3} max={3} step={0.1} onChange={(v) => updateCfg('vignetteSoftness', v)} />
+
+          <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Candle</h3>
+          <Slider label="Scale" value={cfg.candleScale} min={0.3} max={2.5} step={0.05} onChange={(v) => updateCfg('candleScale', v)} unit="x" />
+          <Slider label="Flame X Offset" value={cfg.flameOffsetX} min={-40} max={40} step={1} onChange={(v) => updateCfg('flameOffsetX', v)} unit="px" />
+          <Slider label="Flame Y Offset" value={cfg.flameOffsetY} min={-80} max={20} step={1} onChange={(v) => updateCfg('flameOffsetY', v)} unit="px" />
+
+          <button
+            onClick={() => setCfg(defaultConfig)}
+            className="w-full mt-3 py-1.5 rounded-md text-[10px] font-medium uppercase tracking-wider bg-bg-control text-text-secondary hover:text-text-primary border border-border/50 transition-colors"
+          >
+            Reset Defaults
+          </button>
+        </div>
+      )}
     </div>
   )
 }
