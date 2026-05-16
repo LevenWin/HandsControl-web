@@ -6,7 +6,8 @@ interface CandleConfig {
   candleY: number
   flameOffsetX: number
   flameOffsetY: number
-  candleScale: number
+  candleWidth: number
+  candleHeight: number
   spotlightRadius: number
   flickerAmplitude: number
   flickerSpeed: number
@@ -18,7 +19,8 @@ const defaultConfig: CandleConfig = {
   candleY: 0.35,
   flameOffsetX: 0,
   flameOffsetY: -18,
-  candleScale: 1.0,
+  candleWidth: 64,
+  candleHeight: 0,
   spotlightRadius: 160,
   flickerAmplitude: 8,
   flickerSpeed: 0.03,
@@ -89,8 +91,8 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
 
   const updateCandleScreen = (imgW: number, imgH: number, screenW: number, screenH: number) => {
     const c = cfgRef.current
-    const cw = 64 * c.candleScale
-    const ch = (imgH / imgW) * cw
+    const cw = c.candleWidth
+    const ch = c.candleHeight > 0 ? c.candleHeight : (imgH / imgW) * cw
     const cx = c.candleX * screenW - cw / 2
     const cy = c.candleY * screenH - ch / 2
     candleScreenRef.current = { x: cx, y: cy, w: cw, h: ch }
@@ -377,7 +379,8 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
           <Slider label="Warmth" value={cfg.warmth} min={0} max={1.5} step={0.05} onChange={(v) => updateCfg('warmth', v)} />
 
           <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Candle</h3>
-          <Slider label="Scale" value={cfg.candleScale} min={0.3} max={2.5} step={0.05} onChange={(v) => updateCfg('candleScale', v)} unit="x" />
+          <Slider label="Width" value={cfg.candleWidth} min={20} max={300} step={4} onChange={(v) => updateCfg('candleWidth', v)} unit="px" />
+          <Slider label="Height" value={cfg.candleHeight} min={0} max={500} step={4} onChange={(v) => updateCfg('candleHeight', v)} unit="px" />
           <Slider label="Flame X Offset" value={cfg.flameOffsetX} min={-40} max={40} step={1} onChange={(v) => updateCfg('flameOffsetX', v)} unit="px" />
           <Slider label="Flame Y Offset" value={cfg.flameOffsetY} min={-80} max={20} step={1} onChange={(v) => updateCfg('flameOffsetY', v)} unit="px" />
 
