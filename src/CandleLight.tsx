@@ -12,8 +12,6 @@ interface CandleConfig {
   flickerSpeed: number
   darknessAlpha: number
   warmth: number
-  bloomStrength: number
-  vignetteSoftness: number
 }
 
 const defaultConfig: CandleConfig = {
@@ -27,8 +25,6 @@ const defaultConfig: CandleConfig = {
   flickerSpeed: 0.03,
   darknessAlpha: 0.92,
   warmth: 0.85,
-  bloomStrength: 0.5,
-  vignetteSoftness: 1.0,
 }
 
 interface SliderProps {
@@ -170,9 +166,8 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
       const sinFlicker = Math.sin(flickerPhaseRef.current) * c.flickerAmplitude
       const noiseFlicker = (Math.random() - 0.5) * c.flickerAmplitude * 0.5
       const flickerR = c.spotlightRadius + sinFlicker + noiseFlicker
-      const innerR = flickerR * 0.1
+      const innerR = flickerR * 0.15
 
-      ctx.save()
       ctx.clearRect(0, 0, w, h)
 
       if (bgSource) {
@@ -185,62 +180,36 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
       }
 
       const darkAlpha = c.darknessAlpha
+      ctx.save()
       ctx.fillStyle = `rgba(8,3,0,${darkAlpha})`
       ctx.fillRect(0, 0, w, h)
 
       ctx.globalCompositeOperation = 'destination-out'
       const revealGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, innerR, flameScreenX, flameScreenY, flickerR)
-      revealGrad.addColorStop(0, 'rgba(255,160,40,1)')
-      revealGrad.addColorStop(0.2, 'rgba(255,140,30,0.95)')
-      revealGrad.addColorStop(0.5, 'rgba(255,100,20,0.6)')
-      revealGrad.addColorStop(0.8, 'rgba(200,60,10,0.2)')
-      revealGrad.addColorStop(1, 'rgba(0,0,0,0)')
+      revealGrad.addColorStop(0, 'rgba(255,255,255,1)')
+      revealGrad.addColorStop(0.15, 'rgba(255,255,255,0.97)')
+      revealGrad.addColorStop(0.35, 'rgba(255,255,255,0.85)')
+      revealGrad.addColorStop(0.6, 'rgba(255,255,255,0.5)')
+      revealGrad.addColorStop(0.8, 'rgba(255,255,255,0.15)')
+      revealGrad.addColorStop(1, 'rgba(255,255,255,0)')
       ctx.fillStyle = revealGrad
       ctx.beginPath()
       ctx.arc(flameScreenX, flameScreenY, flickerR, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
 
-      if (bgSource) {
-        ctx.save()
-        const vignetteR = flickerR * 2.2 * c.vignetteSoftness
-        const vignetteGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, flickerR * 0.5, flameScreenX, flameScreenY, vignetteR)
-        vignetteGrad.addColorStop(0, 'rgba(8,3,0,0)')
-        vignetteGrad.addColorStop(0.7, 'rgba(8,3,0,0)')
-        vignetteGrad.addColorStop(1, `rgba(8,3,0,${darkAlpha * 0.7})`)
-        ctx.fillStyle = vignetteGrad
-        ctx.beginPath()
-        ctx.arc(flameScreenX, flameScreenY, vignetteR, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.restore()
-      }
-
       ctx.save()
-      ctx.globalCompositeOperation = 'overlay'
-      const warmthGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, innerR * 0.5, flameScreenX, flameScreenY, flickerR * 1.3)
-      warmthGrad.addColorStop(0, `rgba(255,180,60,${c.warmth * 0.6})`)
-      warmthGrad.addColorStop(0.4, `rgba(255,140,30,${c.warmth * 0.35})`)
-      warmthGrad.addColorStop(0.8, `rgba(200,80,20,${c.warmth * 0.1})`)
-      warmthGrad.addColorStop(1, 'rgba(0,0,0,0)')
-      ctx.fillStyle = warmthGrad
+      const glowR = flickerR * 1.8
+      const glowGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, flickerR * 0.3, flameScreenX, flameScreenY, glowR)
+      glowGrad.addColorStop(0, `rgba(255,180,60,${c.warmth * 0.15})`)
+      glowGrad.addColorStop(0.3, `rgba(255,140,30,${c.warmth * 0.08})`)
+      glowGrad.addColorStop(0.7, 'rgba(200,80,20,0.02)')
+      glowGrad.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.fillStyle = glowGrad
       ctx.beginPath()
-      ctx.arc(flameScreenX, flameScreenY, flickerR * 1.3, 0, Math.PI * 2)
+      ctx.arc(flameScreenX, flameScreenY, glowR, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
-
-      if (c.bloomStrength > 0) {
-        ctx.save()
-        ctx.globalCompositeOperation = 'lighter'
-        const bloomGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, innerR * 0.3, flameScreenX, flameScreenY, flickerR * 0.6)
-        bloomGrad.addColorStop(0, `rgba(255,220,140,${c.bloomStrength * 0.7})`)
-        bloomGrad.addColorStop(0.4, `rgba(255,180,80,${c.bloomStrength * 0.3})`)
-        bloomGrad.addColorStop(1, 'rgba(255,100,30,0)')
-        ctx.fillStyle = bloomGrad
-        ctx.beginPath()
-        ctx.arc(flameScreenX, flameScreenY, flickerR * 0.6, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.restore()
-      }
 
       if (candleImg) {
         const cs = candleScreenRef.current
@@ -411,8 +380,6 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
           <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Lighting</h3>
           <Slider label="Darkness" value={cfg.darknessAlpha} min={0.6} max={0.99} step={0.01} onChange={(v) => updateCfg('darknessAlpha', v)} />
           <Slider label="Warmth" value={cfg.warmth} min={0} max={1.5} step={0.05} onChange={(v) => updateCfg('warmth', v)} />
-          <Slider label="Bloom" value={cfg.bloomStrength} min={0} max={1} step={0.05} onChange={(v) => updateCfg('bloomStrength', v)} />
-          <Slider label="Vignette" value={cfg.vignetteSoftness} min={0.3} max={3} step={0.1} onChange={(v) => updateCfg('vignetteSoftness', v)} />
 
           <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Candle</h3>
           <Slider label="Scale" value={cfg.candleScale} min={0.3} max={2.5} step={0.05} onChange={(v) => updateCfg('candleScale', v)} unit="x" />
