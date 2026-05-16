@@ -547,7 +547,7 @@ export default function PullChain({
 
     const startHands = () => {
       loadHandsScript()
-        .then(() => {
+        .then(async () => {
           if (!handsActive || !videoRef.current) return
 
           const hands = new window.Hands({
@@ -556,10 +556,10 @@ export default function PullChain({
           })
 
           hands.setOptions({
-            maxNumHands: 1,
-            modelComplexity: 1,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.5,
+            maxNumHands: 2,
+            modelComplexity: 0,
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.4,
             selfieMode: false,
           })
 
@@ -568,6 +568,7 @@ export default function PullChain({
           })
 
           handsRef.current = hands
+          await hands.initialize()
 
           const sendFrame = async () => {
             if (!handsActive || !handsRef.current || !videoRef.current || videoRef.current.readyState < 2) {

@@ -70,7 +70,7 @@ export default function LightCanvas({
   useEffect(() => {
     if (useWebcam) {
       navigator.mediaDevices
-        .getUserMedia({ video: { width: 1280, height: 720 } })
+        .getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } })
         .then((s) => {
           setStream(s)
           if (videoRef.current) {
