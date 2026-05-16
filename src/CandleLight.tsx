@@ -167,19 +167,10 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
 
       ctx.clearRect(0, 0, w, h)
 
-      if (bgSource) {
-        const sw = hasWebcam ? (videoRef.current!.videoWidth || w) : (bgImage!.naturalWidth || w)
-        const sh = hasWebcam ? (videoRef.current!.videoHeight || h) : (bgImage!.naturalHeight || h)
-        drawCoverBackground(ctx, bgSource, sw, sh, w, h)
-      } else {
-        ctx.fillStyle = '#000'
-        ctx.fillRect(0, 0, w, h)
-      }
-
-      ctx.save()
-      ctx.fillStyle = 'rgba(0,0,0,1)'
+      ctx.fillStyle = '#000'
       ctx.fillRect(0, 0, w, h)
 
+      ctx.save()
       ctx.globalCompositeOperation = 'destination-out'
       const revealGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, innerR, flameScreenX, flameScreenY, flickerR)
       revealGrad.addColorStop(0, 'rgba(255,255,255,1)')
@@ -193,6 +184,15 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
       ctx.arc(flameScreenX, flameScreenY, flickerR, 0, Math.PI * 2)
       ctx.fill()
       ctx.restore()
+
+      if (bgSource) {
+        ctx.save()
+        ctx.globalCompositeOperation = 'destination-over'
+        const sw = hasWebcam ? (videoRef.current!.videoWidth || w) : (bgImage!.naturalWidth || w)
+        const sh = hasWebcam ? (videoRef.current!.videoHeight || h) : (bgImage!.naturalHeight || h)
+        drawCoverBackground(ctx, bgSource, sw, sh, w, h)
+        ctx.restore()
+      }
 
       ctx.save()
       const glowR = flickerR * 1.6
