@@ -346,7 +346,7 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
           }
 
           if (handGrabbingRef.current) {
-            const midX = (1 - landmarks[9].x) * w + c.handOffsetX
+            const midX = landmarks[9].x * w + c.handOffsetX
             const midY = landmarks[9].y * h + c.handOffsetY
             const nx = (midX - candleScreenRef.current.w / 2) / w
             const ny = (midY - candleScreenRef.current.h / 2) / h
@@ -371,8 +371,8 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
           for (const [a, b] of HAND_CONNECTIONS) {
             if (landmarks[a] && landmarks[b]) {
               ctx.beginPath()
-              ctx.moveTo((1 - landmarks[a].x) * w, landmarks[a].y * h)
-              ctx.lineTo((1 - landmarks[b].x) * w, landmarks[b].y * h)
+              ctx.moveTo(landmarks[a].x * w, landmarks[a].y * h)
+              ctx.lineTo(landmarks[b].x * w, landmarks[b].y * h)
               ctx.stroke()
             }
           }
