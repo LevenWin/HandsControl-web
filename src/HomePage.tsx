@@ -1,4 +1,4 @@
-import { ArrowRight, ExternalLink, Flame } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 
 export default function HomePage({ onEnterChain, onEnterCandle }: { onEnterChain: () => void; onEnterCandle: () => void }) {
   return (
@@ -9,54 +9,52 @@ export default function HomePage({ onEnterChain, onEnterCandle }: { onEnterChain
         }}
       />
 
-      <div className="relative z-10 flex flex-col items-center gap-8 px-6 max-w-lg w-full">
-        <div className="flex flex-col items-center gap-5">
-          <img
-            src="/example.gif"
-            alt="Incandescent Vision Lab"
-            className="w-28 h-28 rounded-2xl shadow-2xl shadow-accent/20 border border-white/10"
-          />
-
-          <div className="text-center space-y-3">
-            <h1 className="text-3xl font-bold text-text-primary tracking-tight">
-              Incandescent Vision Lab
-            </h1>
-            <p className="text-sm text-text-secondary leading-relaxed max-w-sm mx-auto">
-              A physics-based point-light simulator. Grab the virtual light chain with your hand
-              and pull to toggle the incandescent bulb — blending vintage interaction with modern web technology.
-            </p>
-          </div>
+      <div className="relative z-10 flex flex-col items-center gap-10 px-6 w-full max-w-md">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-text-primary tracking-tight">
+            Incandescent Vision Lab
+          </h1>
+          <p className="text-sm text-text-dim mt-2">
+            Interactive light experiments
+          </p>
         </div>
 
-        <div className="flex flex-col gap-3 w-full max-w-xs">
+        <div className="flex flex-col gap-6 w-full">
           <button
             onClick={onEnterChain}
-            className="w-full py-3 rounded-xl bg-accent text-black text-sm font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-amber-400 transition-all shadow-lg shadow-accent/30 active:scale-[0.98]"
+            className="group w-full text-left bg-bg-panel border border-border/40 rounded-2xl p-5 hover:border-accent/30 hover:bg-bg-panel/80 transition-all active:scale-[0.99]"
           >
-            <span>Pull Chain Light</span>
-            <ArrowRight size={16} />
+            <img
+              src="/example.gif"
+              alt="Pull Chain Light"
+              className="w-full h-40 object-cover rounded-xl mb-4 shadow-lg"
+            />
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-text-primary">Pull Chain Light</h2>
+                <p className="text-[11px] text-text-dim mt-0.5">Physics chain + hand tracking</p>
+              </div>
+              <ArrowRight size={16} className="text-text-dim group-hover:text-accent transition-colors" />
+            </div>
           </button>
 
           <button
             onClick={onEnterCandle}
-            className="w-full py-3 rounded-xl bg-warm-glow/20 text-warm-glow text-sm font-semibold uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-warm-glow/30 border border-warm-glow/20 transition-all active:scale-[0.98]"
+            className="group w-full text-left bg-bg-panel border border-border/40 rounded-2xl p-5 hover:border-warm-glow/30 hover:bg-bg-panel/80 transition-all active:scale-[0.99]"
           >
-            <Flame size={16} />
-            <span>Candle Light</span>
-            <ArrowRight size={16} />
+            <img
+              src="/candle.gif"
+              alt="Candle Light"
+              className="w-full h-40 object-cover rounded-xl mb-4 shadow-lg"
+            />
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-text-primary">Candle Light</h2>
+                <p className="text-[11px] text-text-dim mt-0.5">Radial spotlight + candle glow</p>
+              </div>
+              <ArrowRight size={16} className="text-text-dim group-hover:text-warm-glow transition-colors" />
+            </div>
           </button>
-
-          <div className="flex gap-3 justify-center">
-            <a
-              href="https://github.com/LevenWin/HandsControl-web"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="py-2 px-4 rounded-lg text-[11px] font-medium uppercase tracking-wider flex items-center gap-1.5 bg-bg-control text-text-secondary hover:text-text-primary border border-border/50 transition-colors"
-            >
-              <ExternalLink size={13} />
-              GitHub
-            </a>
-          </div>
         </div>
 
         <div className="flex gap-4 text-[10px] text-text-dim uppercase tracking-widest">

@@ -1,30 +1,100 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { ArrowLeft, Upload, Camera, Settings, X } from 'lucide-react'
+import { ArrowLeft, Upload, Camera, Settings, X, Download, FileInput, Music, VolumeX } from 'lucide-react'
+
+const HAND_CONNECTIONS: [number, number][] = [
+  [0,1], [1,2], [2,3], [3,4],
+  [0,5], [5,6], [6,7], [7,8],
+  [0,9], [9,10], [10,11], [11,12],
+  [0,13], [13,14], [14,15], [15,16],
+  [0,17], [17,18], [18,19], [19,20],
+  [5,9], [9,13], [13,17],
+]
+
+interface NormalizedLandmark {
+  x: number
+  y: number
+  z: number
+  visibility?: number
+}
+
+declare global {
+  interface Window {
+    Hands: new (config: { locateFile: (file: string) => string }) => HandsInstance
+  }
+}
+
+interface HandsInstance {
+  close(): Promise<void>
+  onResults(cb: (results: HandResults) => void): void
+  initialize(): Promise<void>
+  reset(): void
+  send(inputs: { image: HTMLVideoElement }): Promise<void>
+  setOptions(options: HandsOptions): void
+}
+
+interface HandsOptions {
+  maxNumHands?: number
+  modelComplexity?: 0 | 1
+  minDetectionConfidence?: number
+  minTrackingConfidence?: number
+  selfieMode?: boolean
+}
+
+interface HandResults {
+  multiHandLandmarks?: NormalizedLandmark[][]
+  multiHandedness?: { index: number; score: number; label: string }[]
+}
+
+function loadHandsScript(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (window.Hands) { resolve(); return }
+    const script = document.createElement('script')
+    script.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js'
+    script.crossOrigin = 'anonymous'
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Failed to load MediaPipe Hands'))
+    document.head.appendChild(script)
+  })
+}
 
 interface CandleConfig {
   candleX: number
   candleY: number
   flameOffsetX: number
   flameOffsetY: number
-  candleWidth: number
-  candleHeight: number
+  candleScale: number
   spotlightRadius: number
   flickerAmplitude: number
   flickerSpeed: number
+  flickerRandomness: number
+  centerBrightness: number
+  edgeSoftness: number
+  glowIntensity: number
+  glowRadius: number
   warmth: number
+  maskColorTemp: number
+  handOffsetX: number
+  handOffsetY: number
 }
 
 const defaultConfig: CandleConfig = {
-  candleX: 0.5,
-  candleY: 0.35,
-  flameOffsetX: 0,
-  flameOffsetY: -18,
-  candleWidth: 64,
-  candleHeight: 0,
-  spotlightRadius: 160,
+  candleX: 0.46481566733919966,
+  candleY: 0.5072977622581403,
+  flameOffsetX: -17,
+  flameOffsetY: -120,
+  candleScale: 2.85,
+  spotlightRadius: 125,
   flickerAmplitude: 8,
-  flickerSpeed: 0.03,
-  warmth: 0.85,
+  flickerSpeed: 0.065,
+  flickerRandomness: 0.5,
+  centerBrightness: 0.15,
+  edgeSoftness: 1,
+  glowIntensity: 0.5,
+  glowRadius: 1.6,
+  warmth: 1.35,
+  maskColorTemp: 1,
+  handOffsetX: 96,
+  handOffsetY: 36,
 }
 
 interface SliderProps {
@@ -78,21 +148,31 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
   const animRef = useRef(0)
   const sizeRef = useRef({ w: 0, h: 0 })
   const flickerPhaseRef = useRef(0)
-  const [useWebcam, setUseWebcam] = useState(false)
+  const [useWebcam, setUseWebcam] = useState(true)
+  const [bgIsWebcam, setBgIsWebcam] = useState(false)
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null)
   const [showPanel, setShowPanel] = useState(false)
   const [cfg, setCfg] = useState<CandleConfig>(defaultConfig)
   const cfgRef = useRef(defaultConfig)
   cfgRef.current = cfg
 
+  const ytPlayerRef = useRef<any>(null)
+  const ytReadyRef = useRef(false)
+  const [ytPlaying, setYtPlaying] = useState(false)
+
   const draggingRef = useRef(false)
   const dragOffsetRef = useRef({ x: 0, y: 0 })
   const candleScreenRef = useRef({ x: 0, y: 0, w: 0, h: 0 })
 
+  const handsRef = useRef<HandsInstance | null>(null)
+  const handLandmarksRef = useRef<NormalizedLandmark[][]>([])
+  const handGrabbingRef = useRef(false)
+  const handSmoothRef = useRef({ x: 0.5, y: 0.35 })
+
   const updateCandleScreen = (imgW: number, imgH: number, screenW: number, screenH: number) => {
     const c = cfgRef.current
-    const cw = c.candleWidth
-    const ch = c.candleHeight > 0 ? c.candleHeight : (imgH / imgW) * cw
+    const cw = 64 * c.candleScale
+    const ch = (imgH / imgW) * cw
     const cx = c.candleX * screenW - cw / 2
     const cy = c.candleY * screenH - ch / 2
     candleScreenRef.current = { x: cx, y: cy, w: cw, h: ch }
@@ -109,6 +189,21 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
     const ox = (dw - iw) / 2
     const oy = (dh - ih) / 2
     ctx.drawImage(source, ox, oy, iw, ih)
+  }, [])
+
+  useEffect(() => {
+    const img = candleImgRef.current
+    if (!img) return
+    const { w, h } = sizeRef.current
+    if (w > 0 && h > 0) {
+      updateCandleScreen(img.naturalWidth, img.naturalHeight, w, h)
+    }
+  }, [cfg.candleScale])
+
+  useEffect(() => {
+    const img = new Image()
+    img.src = '/candle_bg.png'
+    img.onload = () => { setBgImage(img) }
   }, [])
 
   useEffect(() => {
@@ -154,8 +249,9 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
       }
 
       const c = cfgRef.current
-      const hasWebcam = useWebcam && videoRef.current && videoRef.current.readyState >= 2
-      const bgSource = hasWebcam ? videoRef.current : bgImage
+      const hasWebcamVideo = useWebcam && videoRef.current && videoRef.current.readyState >= 2
+      const showWebcamBg = hasWebcamVideo && bgIsWebcam
+      const bgSource = showWebcamBg ? videoRef.current : bgImage
 
       const flameScreenX = c.candleX * w + c.flameOffsetX
       const flameScreenY = c.candleY * h + c.flameOffsetY
@@ -163,9 +259,14 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
 
       flickerPhaseRef.current += c.flickerSpeed
       const sinFlicker = Math.sin(flickerPhaseRef.current) * c.flickerAmplitude
-      const noiseFlicker = (Math.random() - 0.5) * c.flickerAmplitude * 0.5
+      const noiseFlicker = (Math.random() - 0.5) * c.flickerAmplitude * c.flickerRandomness
       const flickerR = c.spotlightRadius + sinFlicker + noiseFlicker
-      const innerR = flickerR * 0.15
+      const innerR = flickerR * c.centerBrightness
+
+      const temp = c.maskColorTemp
+      const maskR = Math.round(255)
+      const maskG = Math.round(220 + 35 * (1 - temp))
+      const maskB = Math.round(140 + 115 * (1 - temp))
 
       ctx.clearRect(0, 0, w, h)
 
@@ -175,12 +276,13 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
       ctx.save()
       ctx.globalCompositeOperation = 'destination-out'
       const revealGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, innerR, flameScreenX, flameScreenY, flickerR)
+      const e = c.edgeSoftness
       revealGrad.addColorStop(0, 'rgba(255,255,255,1)')
-      revealGrad.addColorStop(0.1, 'rgba(255,255,255,1)')
-      revealGrad.addColorStop(0.3, 'rgba(255,255,255,0.88)')
-      revealGrad.addColorStop(0.55, 'rgba(255,255,255,0.45)')
-      revealGrad.addColorStop(0.8, 'rgba(255,255,255,0.08)')
-      revealGrad.addColorStop(1, 'rgba(255,255,255,0)')
+      revealGrad.addColorStop(Math.max(0.02, 0.1 * e), 'rgba(255,255,255,1)')
+      revealGrad.addColorStop(Math.min(0.95, 0.35 * e), `rgba(${maskR},${maskG},${maskB},0.88)`)
+      revealGrad.addColorStop(Math.min(0.96, 0.6 * e), `rgba(${maskR},${maskG},${maskB},0.45)`)
+      revealGrad.addColorStop(Math.min(0.97, 0.85 * e), `rgba(${maskR},${maskG},${maskB},0.08)`)
+      revealGrad.addColorStop(1, 'rgba(0,0,0,0)')
       ctx.fillStyle = revealGrad
       ctx.beginPath()
       ctx.arc(flameScreenX, flameScreenY, flickerR, 0, Math.PI * 2)
@@ -190,18 +292,19 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
       if (bgSource) {
         ctx.save()
         ctx.globalCompositeOperation = 'destination-over'
-        const sw = hasWebcam ? (videoRef.current!.videoWidth || w) : (bgImage!.naturalWidth || w)
-        const sh = hasWebcam ? (videoRef.current!.videoHeight || h) : (bgImage!.naturalHeight || h)
+        const sw = showWebcamBg ? (videoRef.current!.videoWidth || w) : (bgImage!.naturalWidth || w)
+        const sh = showWebcamBg ? (videoRef.current!.videoHeight || h) : (bgImage!.naturalHeight || h)
         drawCoverBackground(ctx, bgSource, sw, sh, w, h)
         ctx.restore()
       }
 
       ctx.save()
-      const glowR = flickerR * 1.6
+      const glowR = flickerR * c.glowRadius
+      const gi = c.glowIntensity
       const glowGrad = ctx.createRadialGradient(flameScreenX, flameScreenY, flickerR * 0.25, flameScreenX, flameScreenY, glowR)
-      glowGrad.addColorStop(0, `rgba(255,180,50,${c.warmth * 0.3})`)
-      glowGrad.addColorStop(0.3, `rgba(255,140,20,${c.warmth * 0.12})`)
-      glowGrad.addColorStop(0.7, 'rgba(200,80,10,0.01)')
+      glowGrad.addColorStop(0, `rgba(255,180,50,${c.warmth * 0.3 * gi})`)
+      glowGrad.addColorStop(0.3, `rgba(255,140,20,${c.warmth * 0.12 * gi})`)
+      glowGrad.addColorStop(0.7, `rgba(200,80,10,${0.01 * gi})`)
       glowGrad.addColorStop(1, 'rgba(0,0,0,0)')
       ctx.fillStyle = glowGrad
       ctx.beginPath()
@@ -212,6 +315,69 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
       if (candleImg) {
         const cs = candleScreenRef.current
         ctx.drawImage(candleImg, cs.x, cs.y, cs.w, cs.h)
+      }
+
+      const allHands = handLandmarksRef.current
+      if (allHands.length > 0) {
+        for (const landmarks of allHands) {
+          if (!landmarks || landmarks.length < 21) continue
+
+          const wrist = landmarks[0]
+          const wristDist = (x: number, y: number) => {
+            const dx = x - wrist.x
+            const dy = y - wrist.y
+            return Math.sqrt(dx * dx + dy * dy)
+          }
+          const middleMcpDist = wristDist(landmarks[9].x, landmarks[9].y)
+          const tipIndices = [4, 8, 12, 16, 20]
+          let curledCount = 0
+          for (const ti of tipIndices) {
+            if (wristDist(landmarks[ti].x, landmarks[ti].y) < middleMcpDist * 1.2) {
+              curledCount++
+            }
+          }
+          const isFist = curledCount >= 4
+
+          if (isFist && !handGrabbingRef.current && !draggingRef.current) {
+            handGrabbingRef.current = true
+          }
+          if (!isFist && handGrabbingRef.current) {
+            handGrabbingRef.current = false
+          }
+
+          if (handGrabbingRef.current) {
+            const midX = (1 - landmarks[9].x) * w + c.handOffsetX
+            const midY = landmarks[9].y * h + c.handOffsetY
+            const nx = (midX - candleScreenRef.current.w / 2) / w
+            const ny = (midY - candleScreenRef.current.h / 2) / h
+            const cx = Math.max(0.02, Math.min(0.98, nx))
+            const cy = Math.max(0.02, Math.min(0.98, ny))
+            handSmoothRef.current.x += (cx - handSmoothRef.current.x) * 0.18
+            handSmoothRef.current.y += (cy - handSmoothRef.current.y) * 0.18
+            setCfg((prev) => ({
+              ...prev,
+              candleX: handSmoothRef.current.x,
+              candleY: handSmoothRef.current.y,
+            }))
+            const img = candleImgRef.current
+            if (img) updateCandleScreen(img.naturalWidth, img.naturalHeight, w, h)
+          }
+
+          ctx.save()
+          ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+          ctx.lineWidth = 2
+          ctx.shadowColor = 'rgba(255,255,255,0.2)'
+          ctx.shadowBlur = 3
+          for (const [a, b] of HAND_CONNECTIONS) {
+            if (landmarks[a] && landmarks[b]) {
+              ctx.beginPath()
+              ctx.moveTo((1 - landmarks[a].x) * w, landmarks[a].y * h)
+              ctx.lineTo((1 - landmarks[b].x) * w, landmarks[b].y * h)
+              ctx.stroke()
+            }
+          }
+          ctx.restore()
+        }
       }
 
       animRef.current = requestAnimationFrame(render)
@@ -270,25 +436,65 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
 
   useEffect(() => {
     if (useWebcam) {
+      let handsActive = true
       navigator.mediaDevices
         .getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' } })
         .then((s) => {
+          if (!handsActive) { s.getTracks().forEach((t) => t.stop()); return }
           streamRef.current = s
           if (!videoRef.current) {
             const v = document.createElement('video')
             v.setAttribute('playsinline', '')
+            v.setAttribute('webkit-playsinline', '')
             v.muted = true
             v.autoplay = true
             v.srcObject = s
-            v.play()
+            v.play().catch(() => {})
             videoRef.current = v
           } else {
             videoRef.current.srcObject = s
-            videoRef.current.play()
+            videoRef.current.play().catch(() => {})
           }
+
+          loadHandsScript().then(async () => {
+            if (!handsActive || !videoRef.current) return
+            const hands = new window.Hands({
+              locateFile: (file: string) =>
+                `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`,
+            })
+            hands.setOptions({
+              maxNumHands: 2,
+              modelComplexity: 0,
+              minDetectionConfidence: 0.5,
+              minTrackingConfidence: 0.4,
+              selfieMode: true,
+            })
+            hands.onResults((results: HandResults) => {
+              handLandmarksRef.current = results.multiHandLandmarks ?? []
+            })
+            handsRef.current = hands
+            await hands.initialize()
+
+            const sendFrame = async () => {
+              if (!handsActive || !handsRef.current || !videoRef.current || videoRef.current.readyState < 2) {
+                if (handsActive) requestAnimationFrame(sendFrame)
+                return
+              }
+              await handsRef.current.send({ image: videoRef.current })
+              if (handsActive) requestAnimationFrame(sendFrame)
+            }
+            sendFrame()
+          }).catch(() => {})
         })
-        .catch(() => setUseWebcam(false))
+        .catch(() => { if (handsActive) setUseWebcam(false) })
       return () => {
+        handsActive = false
+        handLandmarksRef.current = []
+        handGrabbingRef.current = false
+        if (handsRef.current) {
+          handsRef.current.close().catch(() => {})
+          handsRef.current = null
+        }
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((t) => t.stop())
           streamRef.current = null
@@ -296,6 +502,12 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
         }
       }
     } else {
+      handLandmarksRef.current = []
+      handGrabbingRef.current = false
+      if (handsRef.current) {
+        handsRef.current.close().catch(() => {})
+        handsRef.current = null
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop())
         streamRef.current = null
@@ -304,19 +516,89 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
     }
   }, [useWebcam])
 
+  useEffect(() => {
+    const createPlayer = () => {
+      if (ytPlayerRef.current) return
+      ytPlayerRef.current = new (window as any).YT.Player('yt-bgm', {
+        videoId: 'L4TxN85tw7M',
+        playerVars: { autoplay: 1, controls: 0, loop: 1, playlist: 'L4TxN85tw7M' },
+        events: {
+          onReady: () => { ytReadyRef.current = true; setYtPlaying(true) },
+          onStateChange: (e: any) => {
+            if (e.data === 1) setYtPlaying(true)
+            else if (e.data === 2) setYtPlaying(false)
+          },
+        },
+      })
+    }
+
+    if ((window as any).YT?.Player) {
+      createPlayer()
+      return () => { ytPlayerRef.current?.destroy() }
+    }
+
+    const prevCallback = (window as any).onYouTubeIframeAPIReady
+    ;(window as any).onYouTubeIframeAPIReady = () => {
+      if (prevCallback) prevCallback()
+      createPlayer()
+    }
+
+    if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+      const tag = document.createElement('script')
+      tag.src = 'https://www.youtube.com/iframe_api'
+      document.head.appendChild(tag)
+    }
+
+    return () => {
+      ytPlayerRef.current?.destroy()
+    }
+  }, [])
+
+  const toggleBgm = () => {
+    if (!ytPlayerRef.current || !ytReadyRef.current) return
+    if (ytPlaying) {
+      ytPlayerRef.current.pauseVideo()
+    } else {
+      ytPlayerRef.current.playVideo()
+    }
+  }
+
   const handleFileUpload = useCallback((file: File) => {
     const url = URL.createObjectURL(file)
     const img = new Image()
     img.onload = () => {
       setBgImage(img)
-      setUseWebcam(false)
+      setBgIsWebcam(false)
     }
     img.src = url
   }, [])
 
+  const handleExportConfig = useCallback(() => {
+    const json = JSON.stringify(cfg, null, 2)
+    const blob = new Blob([json], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `candle-preset-${Date.now()}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+  }, [cfg])
+
+  const handleImportConfig = useCallback((file: File) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const preset: CandleConfig = JSON.parse(reader.result as string)
+        setCfg(preset)
+      } catch { /* ignore invalid JSON */ }
+    }
+    reader.readAsText(file)
+  }, [])
+
   return (
     <div ref={containerRef} className="w-full h-full bg-black overflow-hidden relative">
-      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ cursor: 'default' }} />
+      <div id="yt-bgm" style={{ position: 'absolute', top: 0, left: 0, width: 1, height: 1, opacity: 0, pointerEvents: 'none' }} />
+      <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" style={{ cursor: 'default', touchAction: 'none' }} />
 
       <div className="absolute top-3 left-3 z-10 flex items-center gap-2">
         <button
@@ -345,15 +627,26 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
           />
         </label>
         <button
-          onClick={() => setUseWebcam((p) => !p)}
+          onClick={() => setBgIsWebcam((p) => !p)}
           className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${
-            useWebcam
+            bgIsWebcam
               ? 'bg-accent/20 text-accent border-accent/30'
               : 'bg-black/40 text-text-secondary hover:text-text-primary border-white/10'
           }`}
-          title="Toggle webcam"
+          title={bgIsWebcam ? 'Switch to image background' : 'Switch to camera background'}
         >
           <Camera size={14} />
+        </button>
+        <button
+          onClick={toggleBgm}
+          className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${
+            ytPlaying
+              ? 'bg-green-500/20 text-green-400 border-green-500/30'
+              : 'bg-black/40 text-text-secondary hover:text-text-primary border-white/10'
+          }`}
+          title={ytPlaying ? 'Pause music' : 'Play music'}
+        >
+          {ytPlaying ? <Music size={14} /> : <VolumeX size={14} />}
         </button>
         <button
           onClick={() => setShowPanel((p) => !p)}
@@ -369,20 +662,33 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
       </div>
 
       {showPanel && (
-        <div className="absolute top-14 right-3 z-20 w-52 bg-black/80 border border-white/10 rounded-xl p-3 backdrop-blur-xl max-h-[80vh] overflow-y-auto">
+        <div className="absolute top-14 right-3 left-3 sm:left-auto z-20 sm:w-56 bg-black/80 border border-white/10 rounded-xl p-3 backdrop-blur-xl max-h-[75vh] overflow-y-auto">
           <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mb-2">Flame</h3>
           <Slider label="Spotlight Radius" value={cfg.spotlightRadius} min={60} max={350} step={1} onChange={(v) => updateCfg('spotlightRadius', v)} unit="px" />
           <Slider label="Flicker Amount" value={cfg.flickerAmplitude} min={0} max={30} step={0.5} onChange={(v) => updateCfg('flickerAmplitude', v)} unit="px" />
           <Slider label="Flicker Speed" value={cfg.flickerSpeed} min={0.005} max={0.12} step={0.005} onChange={(v) => updateCfg('flickerSpeed', v)} />
+          <Slider label="Flicker Randomness" value={cfg.flickerRandomness} min={0} max={2} step={0.05} onChange={(v) => updateCfg('flickerRandomness', v)} />
+
+          <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Mask</h3>
+          <Slider label="Center Brightness" value={cfg.centerBrightness} min={0.02} max={0.4} step={0.01} onChange={(v) => updateCfg('centerBrightness', v)} />
+          <Slider label="Edge Softness" value={cfg.edgeSoftness} min={0.3} max={3} step={0.05} onChange={(v) => updateCfg('edgeSoftness', v)} />
+          <Slider label="Mask Color Temp" value={cfg.maskColorTemp} min={0} max={1} step={0.05} onChange={(v) => updateCfg('maskColorTemp', v)} />
+
+          <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Glow</h3>
+          <Slider label="Glow Intensity" value={cfg.glowIntensity} min={0} max={2} step={0.05} onChange={(v) => updateCfg('glowIntensity', v)} />
+          <Slider label="Glow Radius" value={cfg.glowRadius} min={0.5} max={4} step={0.1} onChange={(v) => updateCfg('glowRadius', v)} unit="x" />
 
           <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Lighting</h3>
-          <Slider label="Warmth" value={cfg.warmth} min={0} max={1.5} step={0.05} onChange={(v) => updateCfg('warmth', v)} />
+          <Slider label="Warmth" value={cfg.warmth} min={0} max={2} step={0.05} onChange={(v) => updateCfg('warmth', v)} />
 
           <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Candle</h3>
-          <Slider label="Width" value={cfg.candleWidth} min={20} max={300} step={4} onChange={(v) => updateCfg('candleWidth', v)} unit="px" />
-          <Slider label="Height" value={cfg.candleHeight} min={0} max={500} step={4} onChange={(v) => updateCfg('candleHeight', v)} unit="px" />
+          <Slider label="Scale" value={cfg.candleScale} min={0.3} max={5} step={0.05} onChange={(v) => updateCfg('candleScale', v)} unit="x" />
           <Slider label="Flame X Offset" value={cfg.flameOffsetX} min={-40} max={40} step={1} onChange={(v) => updateCfg('flameOffsetX', v)} unit="px" />
-          <Slider label="Flame Y Offset" value={cfg.flameOffsetY} min={-80} max={20} step={1} onChange={(v) => updateCfg('flameOffsetY', v)} unit="px" />
+          <Slider label="Flame Y Offset" value={cfg.flameOffsetY} min={-120} max={20} step={1} onChange={(v) => updateCfg('flameOffsetY', v)} unit="px" />
+
+          <h3 className="text-[10px] font-semibold text-text-dim uppercase tracking-widest mt-3 mb-2">Hand Tracking</h3>
+          <Slider label="Hand Offset X" value={cfg.handOffsetX} min={-200} max={200} step={4} onChange={(v) => updateCfg('handOffsetX', v)} unit="px" />
+          <Slider label="Hand Offset Y" value={cfg.handOffsetY} min={-300} max={100} step={4} onChange={(v) => updateCfg('handOffsetY', v)} unit="px" />
 
           <button
             onClick={() => setCfg(defaultConfig)}
@@ -390,6 +696,29 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
           >
             Reset Defaults
           </button>
+
+          <div className="flex gap-2 mt-2">
+            <button
+              onClick={handleExportConfig}
+              className="flex-1 py-1.5 rounded-md text-[10px] font-medium uppercase tracking-wider bg-bg-control text-text-secondary hover:text-text-primary border border-border/50 transition-colors flex items-center justify-center gap-1"
+            >
+              <Download size={11} />
+              Export
+            </button>
+            <label className="flex-1 py-1.5 rounded-md text-[10px] font-medium uppercase tracking-wider bg-bg-control text-text-secondary hover:text-text-primary border border-border/50 transition-colors flex items-center justify-center gap-1 cursor-pointer">
+              <FileInput size={11} />
+              Import
+              <input
+                type="file"
+                accept=".json"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleImportConfig(file)
+                }}
+              />
+            </label>
+          </div>
         </div>
       )}
     </div>
