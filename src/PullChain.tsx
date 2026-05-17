@@ -82,7 +82,7 @@ const defaultConfig: ChainConfig = {
   gravityScale: 0.001,
   pinchThreshold: 35,
   grabRadius: 90,
-  pullTriggerDelta: 31,
+  pullTriggerDelta: 20,
   chainColorHex: '#dcb478',
   chainAlpha: 0.9,
   tipColorHex: '#dcb478',
@@ -231,6 +231,7 @@ export default function PullChain({
   const handCooldownUntilRef = useRef(0)
   const HAND_COOLDOWN_MS = 1500
   const grabStartDistRef = useRef(0)
+  const handLostFramesRef = useRef(0)
 
   const createChain = (anchorX: number, anchorY: number) => {
     const engine = engineRef.current
@@ -366,12 +367,16 @@ export default function PullChain({
 
     const allHands = results.multiHandLandmarks
     if (!allHands || allHands.length === 0) {
-      handCooldownUntilRef.current = 0
-      if (isGrabbingRef.current && !isMouseGrabbingRef.current) {
+      handLostFramesRef.current++
+      if (isGrabbingRef.current && !isMouseGrabbingRef.current && handLostFramesRef.current > 8) {
+        handCooldownUntilRef.current = 0
         releaseAllGrabs()
       }
       return
     }
+
+    handLostFramesRef.current = 0
+    handCooldownUntilRef.current = 0
 
     const tip = bodies[bodies.length - 1]
     let bestLandmarks = allHands[0]
@@ -380,7 +385,7 @@ export default function PullChain({
       for (const hand of allHands) {
         const it = hand[INDEX_TIP]
         const tt = hand[THUMB_TIP]
-        const mx = ((1 - it.x) * w + (1 - tt.x) * w) / 2
+        const mx = (it.x * w + tt.x * w) / 2
         const my = (it.y * h + tt.y * h) / 2
         const dist = Math.hypot(mx - tip.position.x, my - tip.position.y)
         if (dist < bestDist) {
@@ -393,9 +398,9 @@ export default function PullChain({
     const indexTip = bestLandmarks[INDEX_TIP]
     const thumbTip = bestLandmarks[THUMB_TIP]
 
-    const indexTipX = (1 - indexTip.x) * w
+    const indexTipX = indexTip.x * w
     const indexTipY = indexTip.y * h
-    const thumbTipX = (1 - thumbTip.x) * w
+    const thumbTipX = thumbTip.x * w
     const thumbTipY = thumbTip.y * h
 
     const dx = indexTipX - thumbTipX
@@ -415,7 +420,6 @@ export default function PullChain({
 
     if (isGrabbingRef.current && !isMouseGrabbingRef.current) {
       if (!isPinching) {
-        handCooldownUntilRef.current = 0
         releaseAllGrabs()
       } else {
         const tipsX = (indexTipX + thumbTipX) / 2
@@ -563,7 +567,7 @@ export default function PullChain({
             modelComplexity: 0,
             minDetectionConfidence: 0.5,
             minTrackingConfidence: 0.4,
-            selfieMode: false,
+            selfieMode: true,
           })
 
           hands.onResults((results: HandResults) => {
