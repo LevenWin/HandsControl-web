@@ -228,8 +228,8 @@ export default function PullChain({
   const sizeRef = useRef({ w: 0, h: 0 })
   const isMouseGrabbingRef = useRef(false)
   const mouseActiveRef = useRef(false)
-  const handCooldownUntilRef = useRef(0)
-  const HAND_COOLDOWN_MS = 1500
+  const handTriggerCooldownRef = useRef(0)
+  const HAND_TRIGGER_COOLDOWN_MS = 400
   const grabStartDistRef = useRef(0)
   const handLostFramesRef = useRef(0)
 
@@ -299,7 +299,6 @@ export default function PullChain({
   }
 
   const doHandGrab = (x: number, y: number) => {
-    if (Date.now() < handCooldownUntilRef.current) return false
     return doGrab(x, y)
   }
 
@@ -343,18 +342,17 @@ export default function PullChain({
     return ((currentDist - base) / base) * 100
   }
 
-  const fireTrigger = (fromHand: boolean) => {
-    releaseAllGrabs()
-    if (fromHand) {
-      handCooldownUntilRef.current = Date.now() + HAND_COOLDOWN_MS
-    }
+  const fireTrigger = () => {
+    grabStartDistRef.current = getChainDistFromAnchor()
+    handTriggerCooldownRef.current = Date.now() + HAND_TRIGGER_COOLDOWN_MS
     onPullRelease()
   }
 
-  const checkStretchDuringGrab = (fromHand: boolean) => {
+  const checkStretchDuringGrab = () => {
+    if (Date.now() < handTriggerCooldownRef.current) return
     const stretchPct = getStretchPct()
     if (stretchPct > cfg.current.pullTriggerDelta) {
-      fireTrigger(fromHand)
+      fireTrigger()
     }
   }
 
@@ -369,14 +367,14 @@ export default function PullChain({
     if (!allHands || allHands.length === 0) {
       handLostFramesRef.current++
       if (isGrabbingRef.current && !isMouseGrabbingRef.current && handLostFramesRef.current > 8) {
-        handCooldownUntilRef.current = 0
+        handTriggerCooldownRef.current = 0
         releaseAllGrabs()
       }
       return
     }
 
     handLostFramesRef.current = 0
-    handCooldownUntilRef.current = 0
+    handTriggerCooldownRef.current = 0
 
     const tip = bodies[bodies.length - 1]
     let bestLandmarks = allHands[0]
@@ -425,7 +423,7 @@ export default function PullChain({
         const tipsX = (indexTipX + thumbTipX) / 2
         const tipsY = (indexTipY + thumbTipY) / 2
         Matter.Body.setPosition(tip, { x: tipsX, y: tipsY })
-        checkStretchDuringGrab(true)
+        checkStretchDuringGrab()
       }
     }
   }
@@ -459,7 +457,7 @@ export default function PullChain({
     const my = e.clientY - rect.top
 
     Matter.Body.setPosition(bodies[bodies.length - 1], { x: mx, y: my })
-    checkStretchDuringGrab(false)
+    checkStretchDuringGrab()
   }
 
   const handleMouseUp = () => {
