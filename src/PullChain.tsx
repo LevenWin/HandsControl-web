@@ -355,7 +355,7 @@ export default function PullChain({
     if (Date.now() < handTriggerCooldownRef.current) return
     const stretchPct = getStretchPct()
     if (triggerFiredRef.current) {
-      if (stretchPct < -5 || stretchPct > cfg.current.pullTriggerDelta * 1.5) {
+      if (stretchPct < -5 || stretchPct > cfg.current.pullTriggerDelta * 1.2) {
         releaseAllGrabs()
       }
       return
