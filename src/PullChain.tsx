@@ -232,6 +232,7 @@ export default function PullChain({
   const HAND_TRIGGER_COOLDOWN_MS = 400
   const grabStartDistRef = useRef(0)
   const handLostFramesRef = useRef(0)
+  const triggerFiredRef = useRef(false)
 
   const createChain = (anchorX: number, anchorY: number) => {
     const engine = engineRef.current
@@ -289,6 +290,7 @@ export default function PullChain({
     isMouseGrabbingRef.current = false
     grabStartYRef.current = 0
     grabStartDistRef.current = 0
+    triggerFiredRef.current = false
     if (canvasRef.current) canvasRef.current.style.cursor = 'grab'
     Matter.Body.setStatic(tip, false)
     Matter.Body.setVelocity(tip, { x: tip.velocity.x * 0.3, y: tip.velocity.y * 0.3 })
@@ -345,12 +347,19 @@ export default function PullChain({
   const fireTrigger = () => {
     grabStartDistRef.current = getChainDistFromAnchor()
     handTriggerCooldownRef.current = Date.now() + HAND_TRIGGER_COOLDOWN_MS
+    triggerFiredRef.current = true
     onPullRelease()
   }
 
   const checkStretchDuringGrab = () => {
     if (Date.now() < handTriggerCooldownRef.current) return
     const stretchPct = getStretchPct()
+    if (triggerFiredRef.current) {
+      if (stretchPct < -5 || stretchPct > cfg.current.pullTriggerDelta * 1.5) {
+        releaseAllGrabs()
+      }
+      return
+    }
     if (stretchPct > cfg.current.pullTriggerDelta) {
       fireTrigger()
     }
