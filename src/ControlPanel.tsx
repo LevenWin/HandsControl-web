@@ -433,7 +433,7 @@ export default function ControlPanel({
           <span className="text-[9px] font-semibold text-text-dim uppercase tracking-widest">Interaction</span>
           <div className="mt-1.5">
             <Slider label="Grab Radius" value={chainConfig.grabRadius ?? 90} min={30} max={200} step={1} onChange={(v) => onChainConfigChange('grabRadius', v)} unit="px" />
-            <Slider label="Stretch Trigger" value={chainConfig.pullTriggerDelta ?? 31} min={3} max={50} step={1} onChange={(v) => onChainConfigChange('pullTriggerDelta', v)} unit="%" />
+            <Slider label="Stretch Trigger" value={chainConfig.pullTriggerDelta ?? 20} min={3} max={50} step={1} onChange={(v) => onChainConfigChange('pullTriggerDelta', v)} unit="%" />
             <Slider label="Pinch Threshold" value={chainConfig.pinchThreshold ?? 35} min={15} max={100} step={1} onChange={(v) => onChainConfigChange('pinchThreshold', v)} unit="px" />
           </div>
         </div>

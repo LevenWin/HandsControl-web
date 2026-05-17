@@ -20,7 +20,7 @@ const defaultChainConfig: Partial<ChainConfig> = {
   gravityScale: 0.001,
   pinchThreshold: 35,
   grabRadius: 90,
-  pullTriggerDelta: 31,
+  pullTriggerDelta: 20,
   lineWidthIdle: 3,
   lineWidthGrabbed: 4,
   chainColorHex: '#dcb478',
