@@ -1,5 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { ArrowLeft, Upload, Camera, Settings, X, Download, FileInput, Music, VolumeX } from 'lucide-react'
+import IntroOverlay from './IntroOverlay'
 
 const HAND_CONNECTIONS: [number, number][] = [
   [0,1], [1,2], [2,3], [3,4],
@@ -721,6 +722,12 @@ export default function CandleLight({ onBack }: { onBack: () => void }) {
           </div>
         </div>
       )}
+
+      <IntroOverlay
+        title="Candle Light"
+        zh="握紧拳头抓住烛火，移动手部即可拖动烛光位置；张开手心即可放下。烛光会随手而行，照亮黑夜。"
+        en="Make a fist to grab the candle, then move your hand to drag the glow. Open your palm to release it. The flame follows where you guide it."
+      />
     </div>
   )
 }

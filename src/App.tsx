@@ -4,6 +4,8 @@ import LightCanvas from './LightCanvas'
 import ControlPanel from './ControlPanel'
 import HomePage from './HomePage'
 import CandleLight from './CandleLight'
+import StarRain from './StarRain'
+import IntroOverlay from './IntroOverlay'
 import type { LightPreset } from './types'
 import type { ChainConfig } from './PullChain'
 
@@ -53,7 +55,7 @@ export default function App() {
   const [useWebcam, setUseWebcam] = useState(true)
   const [showPanel, setShowPanel] = useState(false)
   const [chainConfig, setChainConfig] = useState<Partial<ChainConfig>>(defaultChainConfig)
-  const [page, setPage] = useState<'home' | 'chain' | 'candle'>('home')
+  const [page, setPage] = useState<'home' | 'chain' | 'candle' | 'starRain'>('home')
 
   const updateChainConfig = useCallback((key: keyof ChainConfig, value: number | boolean | string) => {
     setChainConfig((prev) => ({ ...prev, [key]: value }))
@@ -146,7 +148,7 @@ export default function App() {
       <audio id="sfx-light" src="/light.wav" preload="auto" style={{ display: 'none' }} />
 
       {page === 'home' && (
-        <HomePage onEnterChain={() => setPage('chain')} onEnterCandle={() => setPage('candle')} />
+        <HomePage onEnterChain={() => setPage('chain')} onEnterCandle={() => setPage('candle')} onEnterStarRain={() => setPage('starRain')} />
       )}
 
       {page === 'chain' && (
@@ -196,10 +198,10 @@ export default function App() {
               {showPanel ? <X size={14} /> : <Settings size={14} />}
             </button>
 
-            <img
-              src="/example.gif"
-              alt="Demo"
-              className="absolute bottom-3 left-3 z-[60] w-36 h-auto rounded-lg shadow-lg border border-white/20 opacity-80 hover:opacity-100 transition-opacity"
+            <IntroOverlay
+              title="Pull Chain Light"
+              zh="在摄像头前用拇指与食指捏住灯绳，向下拉动后松开手指，即可点亮或熄灭灯泡。"
+              en="Pinch the chain with your thumb and index finger in front of the camera, pull it down and release to toggle the bulb."
             />
           </div>
 
@@ -250,6 +252,10 @@ export default function App() {
 
       {page === 'candle' && (
         <CandleLight onBack={() => setPage('home')} />
+      )}
+
+      {page === 'starRain' && (
+        <StarRain onBack={() => setPage('home')} />
       )}
     </div>
   )
