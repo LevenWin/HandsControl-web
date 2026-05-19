@@ -509,7 +509,7 @@ export default function StarRain({ onBack }: { onBack: () => void }) {
       const YT = (window as any).YT
       const target = document.getElementById('starrain-yt-player')
       if (!YT || !YT.Player || !target) return
-      const player = new YT.Player(target, {
+      new YT.Player(target, {
         height: '1',
         width: '1',
         playerVars: {
